@@ -1,36 +1,136 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎸 Cifra — Gerador de Cifras com IA
 
-## Getting Started
+App web que busca a letra real de uma música e usa IA para gerar a cifra formatada, limpa e sem anúncios.
 
-First, run the development server:
+---
+
+## Como funciona
+
+1. Usuário digita o nome da música + artista
+2. App busca a letra real via **lyrics.ovh** (API gratuita, sem chave)
+3. IA (**Groq / LLaMA 3.3 70B**) recebe a letra e adiciona os acordes acima de cada linha
+4. Resultado exibido em tela limpa, sem anúncios, sem distrações
+
+---
+
+## Stack
+
+- **Next.js** (App Router) + TypeScript
+- **Tailwind CSS**
+- **Groq SDK** (LLaMA 3.3 70B) — gratuito
+- **lyrics.ovh** — API pública de letras, sem autenticação
+- Deploy recomendado: **Vercel**
+
+---
+
+## Configuração local
+
+### 1. Instalar dependências
+
+```bash
+cd Estudos/chord-sheet
+npm install
+```
+
+### 2. Configurar variáveis de ambiente
+
+Edite o arquivo `.env.local`:
+
+```env
+GROQ_API_KEY=sua-chave-do-groq
+UNLOCK_CODES=CIFRA-A1B2,CIFRA-C3D4,CIFRA-E5F6,CIFRA-G7H8,CIFRA-I9J0
+```
+
+**Onde pegar a chave do Groq (gratuito, sem cartão):**
+→ https://console.groq.com/keys
+
+### 3. Rodar
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse: http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Modelo de negócio
 
-## Learn More
+| Plano | O que oferece | Preço |
+|---|---|---|
+| **Gratuito** | 5 cifras | R$ 0 |
+| **Ilimitado** | Cifras ilimitadas | R$ 10,00 (pagamento único) |
 
-To learn more about Next.js, take a look at the following resources:
+### Fluxo de pagamento
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Usuário usa as 5 cifras gratuitas
+2. Modal de pagamento aparece automaticamente
+3. Usuário paga via **PIX** (chave: `6b07fc79-82d3-43fc-9937-7a04d6e0e4c8`)
+4. Usuário envia comprovante + e-mail para `igorhenriqueconstant@gmail.com`
+5. Você envia um código de desbloqueio manualmente
+6. Usuário digita o código → acesso ilimitado liberado
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Gerenciar códigos de desbloqueio
 
-## Deploy on Vercel
+Os códigos ficam no `.env.local` na variável `UNLOCK_CODES` (separados por vírgula):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```env
+UNLOCK_CODES=CIFRA-A1B2,CIFRA-C3D4,CIFRA-E5F6
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Cada código pode ser usado **uma vez por dispositivo** (controle via localStorage)
+- Quando os códigos acabarem, adicione mais e faça redeploy no Vercel
+- Sugestão de formato: `CIFRA-XXXX` (4 caracteres aleatórios em maiúsculo)
+
+---
+
+## Instrumentos suportados
+
+| Instrumento | Tipo de saída |
+|---|---|
+| 🎸 Violão | Cifra (acordes) |
+| ⚡ Guitarra | Cifra (acordes) |
+| 🎵 Baixo | Cifra para baixo |
+| 🌺 Ukulele | Acordes adaptados para ukulele |
+| 🎹 Teclado | Cifra (acordes) |
+
+---
+
+## Deploy no Vercel
+
+```bash
+npx vercel
+```
+
+Adicione as variáveis de ambiente no painel do Vercel:
+- `GROQ_API_KEY`
+- `UNLOCK_CODES`
+
+---
+
+## Estrutura do projeto
+
+```
+chord-sheet/
+├── app/
+│   ├── page.tsx                  # UI principal (busca, seletor, paywall)
+│   ├── layout.tsx
+│   ├── globals.css
+│   └── api/
+│       ├── chord/
+│       │   └── route.ts          # Busca letra + chama IA
+│       └── validate-code/
+│           └── route.ts          # Valida código de desbloqueio
+├── .env.local                    # Chaves e códigos (não commitar)
+└── package.json
+```
+
+---
+
+## Próximos passos sugeridos
+
+- [ ] Tablatura para baixo (em vez de cifra)
+- [ ] Transpositor de tom (+/- semitons)
+- [ ] Botão de imprimir / salvar como PDF
+- [ ] Automação do envio do código por e-mail (ex: Resend)
+- [ ] Histórico de cifras geradas
