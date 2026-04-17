@@ -19,7 +19,6 @@ App web que busca a letra real de uma música e usa IA para gerar a cifra format
 - **Tailwind CSS**
 - **Groq SDK** (LLaMA 3.3 70B) — gratuito
 - **lyrics.ovh** — API pública de letras, sem autenticação
-- Deploy recomendado: **Vercel** (`cifras.osomdosilencio.com.br`)
 
 ---
 
