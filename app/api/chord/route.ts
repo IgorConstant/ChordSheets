@@ -3,58 +3,53 @@ import Groq from "groq-sdk";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-async function fetchLyrics(song: string, artist: string): Promise<string | null> {
-  // 1ª tentativa: lyrics.ovh
-  try {
-    const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(song)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.lyrics) return data.lyrics as string;
-    }
-  } catch { /* ignora */ }
+function toKebab(str: string) {
+  return str
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
-  // 2ª tentativa: Genius
-  try {
-    const token = process.env.GENIUS_ACCESS_TOKEN;
-    if (token) {
-      const searchRes = await fetch(
-        `https://api.genius.com/search?q=${encodeURIComponent(`${song} ${artist}`)}`,
-        { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) }
-      );
-      if (searchRes.ok) {
-        const searchData = await searchRes.json();
-        const hit = searchData.response?.hits?.[0]?.result;
-        if (hit?.url) {
-          const pageRes = await fetch(hit.url, { signal: AbortSignal.timeout(8000) });
-          if (pageRes.ok) {
-            const html = await pageRes.text();
-            // Extrai texto dos containers de lyrics do Genius
-            const containers = [...html.matchAll(/data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/g)];
-            if (containers.length > 0) {
-              const lyrics = containers
-                .map(([, inner]) =>
-                  inner
-                    .replace(/<br\s*\/?>/gi, "\n")
-                    .replace(/<[^>]+>/g, "")
-                    .replace(/&amp;/g, "&")
-                    .replace(/&apos;/g, "'")
-                    .replace(/&quot;/g, '"')
-                    .replace(/&#x27;/g, "'")
-                    .replace(/&lt;/g, "<")
-                    .replace(/&gt;/g, ">")
-                )
-                .join("\n")
-                .trim();
-              if (lyrics.length > 50) return lyrics;
-            }
-          }
-        }
-      }
-    }
-  } catch { /* ignora */ }
+async function fetchFromLetras(song: string, artist: string): Promise<string> {
+  const url = `https://www.letras.mus.br/${toKebab(artist)}/${toKebab(song)}/`;
+  const res = await fetch(url, {
+    redirect: "follow",
+    signal: AbortSignal.timeout(10000),
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; ChordSheetBot/1.0)" },
+  });
+  if (!res.ok) throw new Error(`letras ${res.status}`);
+  const html = await res.text();
+  const match = html.match(/class="lyric-original">([\s\S]*?)<\/div>/);
+  if (!match) throw new Error("lyrics container not found");
+  const lyrics = match[1]
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&apos;/g, "'").replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (lyrics.length < 20) throw new Error("empty lyrics");
+  return lyrics;
+}
 
-  return null;
+async function fetchLyrics(song: string, artist: string): Promise<string> {
+  // Tenta lyrics.ovh e letras.mus.br em paralelo
+  const results = await Promise.allSettled([
+    fetch(
+      `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(song)}`,
+      { signal: AbortSignal.timeout(20000) }
+    ).then(r => r.ok ? r.json() : Promise.reject()).then(d => {
+      if (!d.lyrics) throw new Error("empty");
+      return d.lyrics as string;
+    }),
+    fetchFromLetras(song, artist),
+  ]);
+
+  const found = results.find(r => r.status === "fulfilled");
+  if (found?.status === "fulfilled") return found.value;
+  throw new Error("not found");
 }
 
 export async function POST(req: NextRequest) {
@@ -78,15 +73,19 @@ export async function POST(req: NextRequest) {
 
   const instrumentName = instrumentLabel[instrument] ?? instrument;
 
-  const lyrics = await fetchLyrics(song, artist);
-
-  const lyricsSection = lyrics
-    ? `Abaixo está a letra REAL da música. Use-a para construir a cifra:\n\nLETRA:\n${lyrics}`
-    : `A letra não foi encontrada automaticamente. Use seu conhecimento para gerar a cifra completa de "${song}" de ${artist}, incluindo a letra e os acordes corretos.`;
+  let lyrics: string;
+  try {
+    lyrics = await fetchLyrics(song, artist);
+  } catch {
+    return NextResponse.json({ error: "Letra não encontrada. Verifique o nome da música e o artista." }, { status: 404 });
+  }
 
   const prompt = `Você é um especialista em cifras para ${instrumentName}.
 
-${lyricsSection}
+Abaixo está a letra REAL da música. Use-a para construir a cifra:
+
+LETRA:
+${lyrics}
 
 Sua tarefa é gerar a cifra COMPLETA de "${song}" de ${artist} para ${instrumentName}.
 
