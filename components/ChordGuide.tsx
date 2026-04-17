@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import ChordDiagram from "./ChordDiagram";
-import { extractChords } from "@/lib/chords";
+import { extractChords, extractSolfegeGroups, SOLFEGE_SEMITONES } from "@/lib/chords";
 
 interface ChordResult {
-  type: "chord" | "bass";
+  type: "chord" | "bass" | "piano";
   position?: { frets: string; fingers: string; barres?: number | number[] };
   root?: string;
   positions?: { string: string; fret: number }[];
+  noteIndices?: number[];
 }
 
 interface Props {
@@ -21,7 +22,22 @@ export default function ChordGuide({ chordSheet, instrument }: Props) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!chordSheet || !["violao", "guitarra", "ukulele", "baixo"].includes(instrument)) {
+    if (!chordSheet) { setData({}); return; }
+
+    // Teclado: extrai grupos de notas em solfejo e monta diagramas de piano localmente
+    if (instrument === "teclado") {
+      const groups = extractSolfegeGroups(chordSheet);
+      const pianoData: Record<string, ChordResult> = {};
+      for (const notes of groups) {
+        const label = notes.join(" ");
+        const noteIndices = notes.map((n) => SOLFEGE_SEMITONES[n.toLowerCase()] ?? 0);
+        pianoData[label] = { type: "piano", noteIndices };
+      }
+      setData(pianoData);
+      return;
+    }
+
+    if (!["violao", "guitarra", "ukulele", "baixo"].includes(instrument)) {
       setData({});
       return;
     }

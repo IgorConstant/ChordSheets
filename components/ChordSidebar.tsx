@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import ChordDiagram from "./ChordDiagram";
-import { extractChords } from "@/lib/chords";
+import { extractChords, extractSolfegeGroups, SOLFEGE_SEMITONES } from "@/lib/chords";
 
 interface ChordResult {
-  type: "chord" | "bass";
+  type: "chord" | "bass" | "piano";
   position?: { frets: string; fingers: string; barres?: number | number[] };
   root?: string;
   positions?: { string: string; fret: number }[];
+  noteIndices?: number[];
 }
 
 interface Props {
@@ -24,7 +25,22 @@ export default function ChordSidebar({ chordSheet, instrument, open, onClose, da
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!chordSheet || !["violao", "guitarra", "ukulele", "baixo"].includes(instrument)) {
+    if (!chordSheet) { setData({}); return; }
+
+    // Teclado: extrai grupos de notas em solfejo e monta diagramas de piano localmente
+    if (instrument === "teclado") {
+      const groups = extractSolfegeGroups(chordSheet);
+      const pianoData: Record<string, ChordResult> = {};
+      for (const notes of groups) {
+        const label = notes.join(" ");
+        const noteIndices = notes.map((n) => SOLFEGE_SEMITONES[n.toLowerCase()] ?? 0);
+        pianoData[label] = { type: "piano", noteIndices };
+      }
+      setData(pianoData);
+      return;
+    }
+
+    if (!["violao", "guitarra", "ukulele", "baixo"].includes(instrument)) {
       setData({});
       return;
     }
@@ -56,7 +72,7 @@ export default function ChordSidebar({ chordSheet, instrument, open, onClose, da
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 right-0 h-full w-72 border-l z-40 transform transition-transform duration-300 flex flex-col ${
+        className={`fixed top-0 right-0 h-full w-96 border-l z-40 transform transition-transform duration-300 flex flex-col ${
           open ? "translate-x-0" : "translate-x-full"
         } ${dark ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"}`}
       >
@@ -77,13 +93,26 @@ export default function ChordSidebar({ chordSheet, instrument, open, onClose, da
             <p className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>Carregando acordes...</p>
           )}
 
-          {!loading && entries.length === 0 && (
+          {!loading && entries.length === 0 && instrument === "gaita" && (
+            <div className={`text-xs space-y-2 ${dark ? "text-gray-400" : "text-gray-500"}`}>
+              <p className="font-semibold">Legenda da tablatura de gaita diatônica:</p>
+              <ul className="space-y-1">
+                <li><span className="font-mono font-bold">+4</span> — Buraco 4, soprar (blow)</li>
+                <li><span className="font-mono font-bold">4</span> — Buraco 4, puxar/inspirar (draw)</li>
+                <li><span className="font-mono font-bold">3'</span> — Buraco 3, puxar com bend de meio tom</li>
+                <li><span className="font-mono font-bold">3''</span> — Buraco 3, puxar com bend de tom inteiro</li>
+              </ul>
+              <p className="mt-3">Os buracos vão de 1 (mais grave) a 10 (mais agudo).</p>
+            </div>
+          )}
+
+          {!loading && entries.length === 0 && instrument !== "gaita" && (
             <p className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>
               Nenhum acorde encontrado. Gere uma cifra primeiro.
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="flex flex-wrap gap-6">
             {entries.map(([name, result]) => (
               <ChordDiagram key={name} name={name} result={result} size="lg" dark={dark} />
             ))}

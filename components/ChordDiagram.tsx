@@ -9,10 +9,11 @@ function fretCharToNum(c: string): number | null {
 }
 
 interface ChordResult {
-  type: "chord" | "bass";
+  type: "chord" | "bass" | "piano";
   position?: { frets: string; fingers: string; barres?: number | number[] };
   root?: string;
   positions?: { string: string; fret: number }[];
+  noteIndices?: number[]; // para piano: semitoms (dó=0..si=11), primeiro é a raiz
 }
 
 interface Props {
@@ -26,7 +27,7 @@ const LIGHT = { grid: "#d1d5db", nut: "#9ca3af", dot: "#185370", dotText: "#ffff
 const DARK  = { grid: "#4b5563", nut: "#6b7280", dot: "#5ba3c9",  dotText: "#ffffff", muted: "#6b7280", fretNum: "#6b7280" };
 
 function GuitarDiagram({ position, size = "sm", c }: { position: NonNullable<ChordResult["position"]>; size?: "sm" | "lg"; c: typeof LIGHT }) {
-  const scale = size === "lg" ? 1.6 : 1;
+  const scale = size === "lg" ? 2.0 : 1;
   const STRINGS = 6;
   const FRETS_SHOWN = 4;
   const W = 80 * scale;
@@ -100,8 +101,97 @@ function GuitarDiagram({ position, size = "sm", c }: { position: NonNullable<Cho
 const BASS_STRINGS_LABEL = ["G", "D", "A", "E"];
 const DOT_R_BASE = 7;
 
+// Teclas brancas: dó ré mi fá sol lá si (semitoms 0 2 4 5 7 9 11)
+const PIANO_WHITE_KEYS = [
+  { semitone: 0,  label: "dó"  },
+  { semitone: 2,  label: "ré"  },
+  { semitone: 4,  label: "mi"  },
+  { semitone: 5,  label: "fá"  },
+  { semitone: 7,  label: "sol" },
+  { semitone: 9,  label: "lá"  },
+  { semitone: 11, label: "si"  },
+];
+
+// Teclas pretas: posição relativa à tecla branca à esquerda
+const PIANO_BLACK_KEYS = [
+  { whiteIdx: 0, semitone: 1  }, // dó#
+  { whiteIdx: 1, semitone: 3  }, // ré#
+  { whiteIdx: 3, semitone: 6  }, // fá#
+  { whiteIdx: 4, semitone: 8  }, // sol#
+  { whiteIdx: 5, semitone: 10 }, // lá#
+];
+
+function PianoDiagram({ noteIndices, size = "sm", c }: {
+  noteIndices: number[];
+  size?: "sm" | "lg";
+  c: typeof LIGHT;
+}) {
+  const scale = size === "lg" ? 2.0 : 1;
+  const WHITE_W  = 14 * scale;
+  const WHITE_H  = 54 * scale;
+  const BLACK_W  = 9  * scale;
+  const BLACK_H  = 34 * scale;
+  const LABEL_H  = 12 * scale;
+  const W = 7 * WHITE_W + 1;
+  const H = WHITE_H + LABEL_H + 2;
+
+  const root    = noteIndices[0];
+  const noteSet = new Set(noteIndices);
+
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      {/* Teclas brancas */}
+      {PIANO_WHITE_KEYS.map(({ semitone, label }, i) => {
+        const isRoot   = semitone === root;
+        const isActive = noteSet.has(semitone);
+        return (
+          <g key={i}>
+            <rect
+              x={i * WHITE_W + 0.5}
+              y={0.5}
+              width={WHITE_W - 1}
+              height={WHITE_H - 1}
+              rx={2}
+              fill={isRoot ? c.dot : isActive ? "#93c5fd" : "white"}
+              stroke={c.grid}
+              strokeWidth={1}
+            />
+            <text
+              x={i * WHITE_W + WHITE_W / 2}
+              y={WHITE_H + LABEL_H * 0.8}
+              textAnchor="middle"
+              fontSize={5.5 * scale}
+              fill={isActive ? (isRoot ? c.dot : "#3b82f6") : c.muted}
+              fontWeight={isActive ? "bold" : "normal"}
+            >
+              {label}
+            </text>
+          </g>
+        );
+      })}
+      {/* Teclas pretas */}
+      {PIANO_BLACK_KEYS.map(({ whiteIdx, semitone }) => {
+        const isRoot   = semitone === root;
+        const isActive = noteSet.has(semitone);
+        return (
+          <rect
+            key={semitone}
+            x={(whiteIdx + 1) * WHITE_W - BLACK_W / 2}
+            y={0.5}
+            width={BLACK_W}
+            height={BLACK_H}
+            rx={2}
+            fill={isRoot ? c.dot : isActive ? "#3b82f6" : "#1f2937"}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+
 function BassDiagram({ positions, size = "sm", c }: { positions: { string: string; fret: number }[]; size?: "sm" | "lg"; c: typeof LIGHT }) {
-  const scale = size === "lg" ? 1.6 : 1;
+  const scale = size === "lg" ? 2.0 : 1;
   const BASS_STRINGS = 4;
   const BASS_FRETS = 5;
   const W = 80 * scale;
@@ -160,7 +250,9 @@ export default function ChordDiagram({ name, result, size = "sm", dark = false }
   return (
     <div className="flex flex-col items-center gap-1">
       <span className={`font-semibold ${size === "lg" ? "text-sm" : "text-xs"}`} style={{ color: nameColor }}>{name}</span>
-      {result.type === "bass" && result.positions ? (
+      {result.type === "piano" && result.noteIndices ? (
+        <PianoDiagram noteIndices={result.noteIndices} size={size} c={c} />
+      ) : result.type === "bass" && result.positions ? (
         <BassDiagram positions={result.positions} size={size} c={c} />
       ) : result.position ? (
         <GuitarDiagram position={result.position} size={size} c={c} />

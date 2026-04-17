@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ChordSidebar from "@/components/ChordSidebar";
+import ChordPlayer from "@/components/ChordPlayer";
 
 const INSTRUMENTS = [
   { value: "violao", label: "🎸 Violão" },
@@ -9,6 +10,7 @@ const INSTRUMENTS = [
   { value: "baixo", label: "🎵 Baixo" },
   { value: "ukulele", label: "🌺 Ukulele" },
   { value: "teclado", label: "🎹 Teclado" },
+  { value: "gaita", label: "🎶 Gaita" },
 ];
 
 export default function Home() {
@@ -176,9 +178,7 @@ export default function Home() {
                   🎓 Ver acordes
                 </button>
               </div>
-              <pre className={`whitespace-pre-wrap font-mono text-sm leading-relaxed ${t.pre}`}>
-                {chordSheet}
-              </pre>
+              <ChordPlayer chordSheet={chordSheet} dark={dark} />
             </div>
           )}
 
