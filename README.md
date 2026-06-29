@@ -1,4 +1,4 @@
-# 🎸 Cifra — Gerador de Cifras com IA
+# Cifra — Gerador de Cifras com IA
 
 App web que busca a letra real de uma música e usa IA para gerar a cifra formatada, limpa e sem anúncios. Um projeto de [o som do silêncio](https://osomdosilencio.com.br).
 
